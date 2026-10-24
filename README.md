@@ -2,6 +2,20 @@
 
 A local writing app for novels: a chapter editor with built-in version history, an inputs tray for everything still owed to the book, and AI review passes (Claude and Gemini) that read and flag but never write into the manuscript. The brief it is built from is `CLAUDE.md`.
 
+## Install
+
+Every release on the [Releases page](https://github.com/oopra/myNovels/releases) carries ready-made builds, produced by the `release` GitHub Actions workflow when a `v*` tag is pushed:
+
+| What | File | Install |
+| --- | --- | --- |
+| Windows app | `Novel Workbench_<version>_x64-setup.exe` (or the `.msi`) | Run it. Windows SmartScreen asks once because the build is not code-signed: choose *More info → Run anyway*. |
+| Android app | `novel-workbench-<version>-android.apk` | Open it on the phone, allow installing from this source. Unless you add a keystore as repository secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`), each release is signed with a fresh key and an update needs the old one uninstalled first. |
+| Server (cloud) | `ghcr.io/oopra/mynovels:<version>` | Run the image on any host with a volume at `/data`; see "In the cloud" below. No build step. |
+
+On first launch the app asks for the server URL and access token; after that everything lives on the server.
+
+To cut a release: `git tag v0.1.1 && git push origin v0.1.1`.
+
 ## Run it
 
 ```bash
@@ -28,10 +42,10 @@ In this mode the novel folders live on the server and every device sees the same
 
 The novels, prompts, exports and the access token all live under `/data` in the container, so mount a persistent volume there. The `claude` CLI login is not available in the cloud; set `ANTHROPIC_API_KEY` (Claude Console; Max plans include monthly API credit) and `GEMINI_API_KEY` (AI Studio) as secrets and the app uses the API routes. Environment keys win over anything saved in Settings.
 
-**Fly.io** (TLS, a volume and suspend-when-idle come built in):
+**Fly.io** (TLS, a volume and suspend-when-idle come built in). With the published image nothing is built locally:
 
 ```bash
-fly launch --copy-config --no-deploy        # creates the app from fly.toml; pick your region
+fly launch --copy-config --no-deploy --image ghcr.io/oopra/mynovels:latest   # pick your region
 fly volumes create workbench_data --size 1  # 1 GB holds many novels
 fly secrets set ANTHROPIC_API_KEY=sk-ant-... GEMINI_API_KEY=... NOVEL_WORKBENCH_TOKEN=$(openssl rand -base64 24)
 fly deploy
