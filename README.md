@@ -42,6 +42,34 @@ fly open                                    # paste the token when the UI asks
 
 **Backups and the manuscript never being trapped:** set *Export git remote* in Settings to a repository URL that carries a token (`https://<token>@github.com/you/manuscript.git`); every "Export + commit" then also pushes. For the database itself, snapshot the volume (`fly volumes snapshots list`) or copy `/data/novels/*/novel.db`; SQLite in WAL mode copies safely with `sqlite3 novel.db ".backup out.db"`.
 
+## Native app (Windows and Android)
+
+`src-tauri/` is a Tauri 2 shell around the same UI. It stores nothing on the device: on first launch the Home screen asks for the server URL (your cloud workbench, HTTPS) and the access token, and every screen then talks to that server. HTML5 drag-and-drop is kept working by turning off Tauri's native drag handler (`dragDropEnabled: false`), which the editor's place-an-input gesture depends on.
+
+**Windows** (build on Windows; produces an `.msi` and an NSIS `.exe` under `src-tauri/target/release/bundle/`):
+
+```powershell
+# once: Rust (https://rustup.rs), Visual Studio Build Tools with the "Desktop development with C++" workload, Node 22
+npm install
+npm run app:build
+```
+
+The installer downloads the WebView2 runtime if the machine lacks it. `npm run app:dev` opens the shell against the Vite dev server for UI work.
+
+**Android** (any OS with Android Studio; produces an `.apk`/`.aab` under `src-tauri/gen/android/app/build/outputs/`):
+
+```bash
+# once: Android Studio with SDK + NDK, set ANDROID_HOME and NDK_HOME, then the Rust targets:
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+npm install
+npm run tauri android init        # generates src-tauri/gen/android once
+npm run app:android               # release build; `npm run tauri android dev` runs on a connected device
+```
+
+Android blocks plain `http://` by default, so the server must be reachable over HTTPS (Fly.io gives that for free). Sign the release build with your own keystore before distributing it; Tauri's Android guide covers `keystore.properties`.
+
+The Rust side was type-checked for the Windows target from this Linux build (`cargo check --target x86_64-pc-windows-msvc`); the packaged installers themselves can only be produced on the target platform's toolchain. macOS and iOS need only `npm run app:build` on a Mac and `npm run tauri ios init` respectively, with the same shell.
+
 ## Layout
 
 ```
@@ -92,5 +120,5 @@ The brief lists sync as a non-goal; the owner has since asked for a central data
 
 ## Not done yet
 
-- Electron wrapper (the brief's step after the screens work). With a central server the browser is the client on every device, so this may no longer be wanted.
+- Packaged installers for Windows and Android must be built on those toolchains; the shell code is in place and type-checked.
 - The acceptance tests that need a live model (Voice on draft 3 saying DRIFTED) are covered with a fake provider; the statistics the model receives are tested for real.

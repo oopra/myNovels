@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { streamSSE } from 'hono/streaming';
+import { cors } from 'hono/cors';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +35,9 @@ function accessToken(): string | null {
   if (!fs.existsSync(f)) fs.writeFileSync(f, crypto.randomBytes(24).toString('base64url'), { mode: 0o600 });
   return fs.readFileSync(f, 'utf8').trim();
 }
+// The native app (Tauri) loads the UI from its own origin (tauri://localhost, http://tauri.localhost)
+// and calls this API across origins. Auth is a bearer token, never a cookie, so any origin may ask.
+app.use('/api/*', cors({ origin: '*', allowHeaders: ['content-type', 'authorization', 'x-novel'], allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], maxAge: 86400 }));
 app.use('/api/*', async (c, next) => {
   if (TOKEN) {
     const h = c.req.header('authorization') ?? '';

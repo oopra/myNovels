@@ -5,7 +5,15 @@ export const currentNovel = (): string | null => localStorage.getItem(NOVEL_KEY)
 export const setCurrentNovel = (folder: string | null) => { if (folder) localStorage.setItem(NOVEL_KEY, folder); else localStorage.removeItem(NOVEL_KEY); };
 
 const TOKEN_KEY = 'nw.token';
+const SERVER_KEY = 'nw.server';
 export const accessToken = (): string | null => localStorage.getItem(TOKEN_KEY);
+export const setAccessToken = (t: string | null) => { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); };
+/** Base URL of the workbench server. Empty means same origin (the UI was served by the server itself).
+ *  The native app has no same origin, so it must be told where the server is. */
+export const serverUrl = (): string => (localStorage.getItem(SERVER_KEY) ?? '').replace(/\/+$/, '');
+export const setServerUrl = (u: string) => { const v = u.trim().replace(/\/+$/, ''); if (v) localStorage.setItem(SERVER_KEY, v); else localStorage.removeItem(SERVER_KEY); };
+export const isNativeShell = (): boolean => typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || /^(tauri|https?):\/\/tauri\.localhost/.test(location.origin) || location.protocol === 'tauri:');
+const abs = (url: string) => `${serverUrl()}${url}`;
 
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
 
@@ -14,10 +22,10 @@ async function req<T>(method: string, url: string, body?: unknown, opts: { keepa
   const novel = currentNovel();
   if (novel) headers['x-novel'] = novel;
   const tok = accessToken(); if (tok) headers['authorization'] = `Bearer ${tok}`;
-  const r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), keepalive: opts.keepalive });
+  const r = await fetch(abs(url), { method, headers, body: body === undefined ? undefined : JSON.stringify(body), keepalive: opts.keepalive });
   if (r.status === 401 && (await r.clone().json().catch(() => ({}))).error === 'access token required') {
-    const t = prompt('This workbench server needs its access token (printed when the server starts, stored in its config directory):');
-    if (t) { localStorage.setItem(TOKEN_KEY, t.trim()); return req<T>(method, url, body, opts); }
+    const t = prompt('This workbench server needs its access token (printed when the server starts, or the NOVEL_WORKBENCH_TOKEN secret):');
+    if (t) { setAccessToken(t.trim()); return req<T>(method, url, body, opts); }
   }
   if (!r.ok) {
     let msg = r.statusText;
@@ -102,7 +110,7 @@ export type RunEvent =
 export async function runPass(r: RunRequest, onEvent: (e: RunEvent) => void, signal?: AbortSignal): Promise<void> {
   const headers: Record<string, string> = { 'content-type': 'application/json', 'x-novel': currentNovel() ?? '' };
   const tok = accessToken(); if (tok) headers['authorization'] = `Bearer ${tok}`;
-  const res = await fetch('/api/n/reviews/run', { method: 'POST', headers, body: JSON.stringify(r), signal });
+  const res = await fetch(abs('/api/n/reviews/run'), { method: 'POST', headers, body: JSON.stringify(r), signal });
   if (!res.ok || !res.body) { let msg = res.statusText; try { msg = (await res.json()).error ?? msg; } catch { /* */ } throw new ApiError(msg, res.status); }
   const reader = res.body.getReader();
   const dec = new TextDecoder();
