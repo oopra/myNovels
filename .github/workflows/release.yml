@@ -2,13 +2,19 @@
 #   - Windows installer (.msi and setup .exe)
 #   - Android APK (signed with your keystore if the secrets exist, otherwise with a throwaway CI key)
 #   - the server image on GHCR (ghcr.io/<owner>/<repo>) for the cloud host
-# Trigger: push a tag like v0.1.0, or run it by hand from the Actions tab.
+# Trigger: every push to main (the release is named v<version> from package.json and updated in place),
+# a tag like v0.1.0, or by hand from the Actions tab. Bump "version" in package.json to cut a new release.
 name: release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+
+env:
+  # The release every job attaches to: the tag when one was pushed, else v<package.json version>.
+  RELEASE_TAG: ""
 
 permissions:
   contents: write
@@ -19,6 +25,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve release tag
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "RELEASE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV";
+          else echo "RELEASE_TAG=v$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"; fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -33,9 +44,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: "Novel Workbench ${{ github.ref_name }}"
-          releaseBody: "Windows: run the .exe (SmartScreen will ask once; choose More info → Run anyway). Android: install the .apk. Server image: ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: "Novel Workbench ${{ env.RELEASE_TAG }}"
+          releaseBody: "Windows: run the .exe (SmartScreen will ask once; choose More info → Run anyway). Android: install the .apk. Server image: ghcr.io/${{ github.repository }}:${{ env.RELEASE_TAG }}"
           releaseDraft: false
           prerelease: false
           args: --bundles nsis,msi
@@ -50,6 +61,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve release tag
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "RELEASE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV";
+          else echo "RELEASE_TAG=v$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"; fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -92,25 +108,29 @@ jobs:
             PASS=cipass; ALIAS=ci
           fi
           $BT/zipalign -p 4 "$UNSIGNED" /tmp/aligned.apk
-          $BT/apksigner sign --ks /tmp/release.jks --ks-pass "pass:$PASS" --ks-key-alias "$ALIAS" --out "novel-workbench-${GITHUB_REF_NAME}-android.apk" /tmp/aligned.apk
-          $BT/apksigner verify "novel-workbench-${GITHUB_REF_NAME}-android.apk"
+          $BT/apksigner sign --ks /tmp/release.jks --ks-pass "pass:$PASS" --ks-key-alias "$ALIAS" --out "novel-workbench-${RELEASE_TAG}-android.apk" /tmp/aligned.apk
+          $BT/apksigner verify "novel-workbench-${RELEASE_TAG}-android.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: "*.apk"
       - name: Attach APK to the release
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for i in 1 2 3 4 5 6; do gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && break; sleep 20; done
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "Novel Workbench $GITHUB_REF_NAME" --notes "Android: install the .apk. Windows installer is attached by the windows job."
-          gh release upload "$GITHUB_REF_NAME" *.apk --clobber
+          for i in 1 2 3 4 5 6; do gh release view "$RELEASE_TAG" >/dev/null 2>&1 && break; sleep 20; done
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "Novel Workbench $RELEASE_TAG" --notes "Android: install the .apk. Windows: run the setup .exe. Server image: ghcr.io/${GITHUB_REPOSITORY,,}:$RELEASE_TAG"
+          gh release upload "$RELEASE_TAG" *.apk --clobber
 
   server-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve release tag
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then echo "RELEASE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV";
+          else echo "RELEASE_TAG=v$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"; fi
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -125,6 +145,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ steps.meta.outputs.repo }}:latest
-            ghcr.io/${{ steps.meta.outputs.repo }}:${{ github.ref_name }}
+            ghcr.io/${{ steps.meta.outputs.repo }}:${{ env.RELEASE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

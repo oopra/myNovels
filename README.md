@@ -14,7 +14,7 @@ Every release on the [Releases page](https://github.com/oopra/myNovels/releases)
 
 On first launch the app asks for the server URL and access token; after that everything lives on the server.
 
-To cut a release: `git tag v0.1.1 && git push origin v0.1.1`.
+To cut a release: bump `version` in `package.json` and push to `main` (or push a `v*` tag). The workflow creates or updates the release `v<version>`.
 
 ## Run it
 
