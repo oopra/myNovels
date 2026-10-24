@@ -92,7 +92,7 @@ export class AnthropicCliProvider implements Provider {
   async *complete(req: CompleteRequest): AsyncIterable<StreamChunk> {
     const prompt = req.messages.map(m => (m.role === 'assistant' ? `[assistant]\n${m.content}` : m.content)).join('\n\n');
     const args = ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
-      '--tools', '', '--no-session-persistence', '--disable-slash-commands', '--setting-sources', '',
+      '--tools', '', '--no-session-persistence', '--disable-slash-commands', '--setting-sources', '', '--exclude-dynamic-system-prompt-sections',
       '--model', req.model, '--system-prompt', req.system];
     const child = spawn(this.bin, args, { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(req.maxTokens) } });
     child.stdin.end(prompt);

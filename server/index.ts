@@ -6,7 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openNovel, closeNovel, knownNovels, type Novel } from './novel';
-import { defaultNovelsRoot } from './paths';
+import { defaultNovelsRoot, configDir } from './paths';
+import crypto from 'node:crypto';
 import { NotFound, BadRequest, Refused } from './store';
 import { exportNovel } from './lib/export';
 import type { PassName, ProviderId, InputStatus } from '../shared/types';
@@ -21,6 +22,26 @@ import { splitParagraphs, voiceStats } from '../shared/text';
 type Env = { Variables: { novel: Novel } };
 export const app = new Hono<Env>();
 const PORT = Number(process.env.PORT ?? 4801);
+const HOST = process.env.HOST ?? '127.0.0.1';
+const TOKEN = accessToken();
+
+/** Central-server mode: when bound to a non-loopback host, or when a token is configured, every
+ *  /api request must carry it. The token lives in the app config directory, never in a novel folder. */
+function accessToken(): string | null {
+  if (process.env.NOVEL_WORKBENCH_TOKEN) return process.env.NOVEL_WORKBENCH_TOKEN;
+  if (HOST === '127.0.0.1' || HOST === 'localhost' || HOST === '::1') return null;
+  const f = path.join(configDir(), 'access-token');
+  if (!fs.existsSync(f)) fs.writeFileSync(f, crypto.randomBytes(24).toString('base64url'), { mode: 0o600 });
+  return fs.readFileSync(f, 'utf8').trim();
+}
+app.use('/api/*', async (c, next) => {
+  if (TOKEN) {
+    const h = c.req.header('authorization') ?? '';
+    const t = h.startsWith('Bearer ') ? h.slice(7) : c.req.query('token');
+    if (t !== TOKEN) return c.json({ error: 'access token required' }, 401);
+  }
+  await next();
+});
 
 app.onError((err, c) => {
   const status = (err as { status?: number }).status;
@@ -147,7 +168,7 @@ if (fs.existsSync(clientDir)) {
 }
 
 if (process.env.VITEST === undefined) {
-  serve({ fetch: app.fetch, port: PORT, hostname: '127.0.0.1' }, info => {
-    console.log(`Novel Workbench backend on http://127.0.0.1:${info.port}`);
+  serve({ fetch: app.fetch, port: PORT, hostname: HOST }, info => {
+    console.log(`Novel Workbench backend on http://${HOST}:${info.port}${TOKEN ? ' (access token required; see ' + path.join(configDir(), 'access-token') + ')' : ''}`);
   });
 }

@@ -8,7 +8,8 @@
     "server": "tsx watch server/index.ts",
     "client": "vite",
     "build": "tsc -p tsconfig.server.json && vite build",
-    "start": "node dist/server/index.js",
+    "start": "tsx server/index.ts",
+    "serve": "npm run build && HOST=0.0.0.0 tsx server/index.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json"
   },
