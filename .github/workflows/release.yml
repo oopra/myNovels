@@ -58,7 +58,7 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi
 
   android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Resolve release tag
@@ -123,7 +123,7 @@ jobs:
           gh release upload "$RELEASE_TAG" *.apk --clobber
 
   server-image:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Resolve release tag
