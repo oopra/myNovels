@@ -1,0 +1,28 @@
+# Fly.io: `fly launch --copy-config --no-deploy`, then `fly volumes create workbench_data --size 1`,
+# `fly secrets set ANTHROPIC_API_KEY=... GEMINI_API_KEY=... NOVEL_WORKBENCH_TOKEN=...`, then `fly deploy`.
+app = "novel-workbench"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  HOST = "0.0.0.0"
+  PORT = "4801"
+  NOVEL_WORKBENCH_CONFIG = "/data/config"
+  NOVEL_WORKBENCH_NOVELS = "/data/novels"
+
+[[mounts]]
+  source = "workbench_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 4801
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

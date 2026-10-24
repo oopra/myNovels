@@ -12,7 +12,7 @@ import { NotFound, BadRequest, Refused } from './store';
 import { exportNovel } from './lib/export';
 import type { PassName, ProviderId, InputStatus } from '../shared/types';
 import { PASS_LABELS } from '../shared/types';
-import { getKey, setKey, keyStoreMode } from './ai/keys';
+import { getKey, setKey, keyStoreMode, envKey } from './ai/keys';
 import { providerStatus, listModels, testConnection, providerFor, modelFor } from './ai/registry';
 import { readPrompt, writePrompt } from './ai/context';
 import { runPass, preview, acceptAlternative, lineCapState } from './ai/run';
@@ -123,7 +123,7 @@ app.post('/api/n/export', async c => { const n = c.get('novel'); return c.json(a
 // ---------- settings, keys, providers ----------
 app.get('/api/n/settings', c => c.json(S(c).allSettings()));
 app.put('/api/n/settings', async c => { const patch = await c.req.json<Record<string, string>>(); for (const [k, v] of Object.entries(patch)) { if (/key|secret|token/i.test(k)) throw new Refused('API keys are not stored in settings'); S(c).setSetting(k, v); } return c.json(S(c).allSettings()); });
-app.get('/api/keys', async c => c.json({ mode: await keyStoreMode(), anthropic: !!(await getKey('anthropic')), gemini: !!(await getKey('gemini')) }));
+app.get('/api/keys', async c => c.json({ mode: await keyStoreMode(), anthropic: !!(await getKey('anthropic')), gemini: !!(await getKey('gemini')), env: { anthropic: !!envKey('anthropic'), gemini: !!envKey('gemini') } }));
 app.put('/api/keys/:provider', async c => { const { key } = await c.req.json<{ key: string }>(); const p = c.req.param('provider'); if (p !== 'anthropic' && p !== 'gemini') throw new BadRequest('unknown provider'); await setKey(p, key ?? ''); return c.json({ ok: true, mode: await keyStoreMode() }); });
 app.get('/api/n/providers', async c => c.json(await providerStatus(S(c))));
 app.get('/api/n/providers/:id/models', async c => c.json(await listModels(S(c), c.req.param('id') as ProviderId, c.req.query('refresh') === '1')));
@@ -169,6 +169,6 @@ if (fs.existsSync(clientDir)) {
 
 if (process.env.VITEST === undefined) {
   serve({ fetch: app.fetch, port: PORT, hostname: HOST }, info => {
-    console.log(`Novel Workbench backend on http://${HOST}:${info.port}${TOKEN ? ' (access token required; see ' + path.join(configDir(), 'access-token') + ')' : ''}`);
+    console.log(`Novel Workbench backend on http://${HOST}:${info.port}${TOKEN ? (process.env.NOVEL_WORKBENCH_TOKEN ? ' (access token from NOVEL_WORKBENCH_TOKEN)' : ' (access token required; see ' + path.join(configDir(), 'access-token') + ')') : ''}`);
   });
 }

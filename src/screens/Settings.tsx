@@ -9,7 +9,7 @@ const PASSES = Object.keys(PASS_LABELS) as PassName[];
 export function Settings() {
   const { toast, refreshNovel } = useApp();
   const [settings, setSettings] = useState<Record<string, string>>({});
-  const [keys, setKeys] = useState<{ mode: string; anthropic: boolean; gemini: boolean } | null>(null);
+  const [keys, setKeys] = useState<{ mode: string; anthropic: boolean; gemini: boolean; env: { anthropic: boolean; gemini: boolean } } | null>(null);
   const [status, setStatus] = useState<{ id: ProviderId; mode: string; ready: boolean; reason?: string; model: string; hasKey: boolean }[]>([]);
   const [models, setModels] = useState<Record<ProviderId, ModelInfo[]>>({ anthropic: [], gemini: [] });
   const [keyInput, setKeyInput] = useState<Record<ProviderId, string>>({ anthropic: '', gemini: '' });
@@ -50,6 +50,7 @@ export function Settings() {
         <div className="settings-grid">
           <label>Title</label><input defaultValue={settings.title ?? ''} onBlur={e => e.target.value !== (settings.title ?? '') && set('title', e.target.value)} />
           <label>Export path</label><input className="mono" defaultValue={settings['export.path'] ?? ''} placeholder="<novel folder>/manuscript" onBlur={e => e.target.value !== (settings['export.path'] ?? '') && set('export.path', e.target.value)} />
+          <label>Export git remote</label><input className="mono" defaultValue={settings['export.remote'] ?? ''} placeholder="optional: https://<token>@github.com/you/manuscript.git — pushed after each export" onBlur={e => e.target.value !== (settings['export.remote'] ?? '') && set('export.remote', e.target.value)} />
         </div>
       </div>
 
@@ -70,10 +71,11 @@ export function Settings() {
                 </select>
               </>)}
               <label>{s.id === 'anthropic' ? 'API key (fallback)' : 'API key (AI Studio)'}</label>
+              {keys?.env[s.id] ? <div className="muted small">Set by the server environment ({s.id === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'GEMINI_API_KEY'}); change it there.</div> : (
               <div className="row">
                 <input type="password" placeholder={s.hasKey ? '•••••••• saved — paste to replace, save empty to remove' : 'paste key'} value={keyInput[s.id]} onChange={e => setKeyInput(x => ({ ...x, [s.id]: e.target.value }))} style={{ flex: 1 }} />
                 <button onClick={() => saveKey(s.id)}>Save</button>
-              </div>
+              </div>)}
               <label>Default model</label>
               <div className="row">{modelSelect(s.id, `${s.id}.model`, false)}<button className="small" onClick={() => api.models(s.id, true).then(m => setModels(x => ({ ...x, [s.id]: m }))).catch(e => toast(e.message, 'err'))}>Fetch list</button></div>
               <label>Connection</label>

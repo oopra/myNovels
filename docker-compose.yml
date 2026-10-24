@@ -1,0 +1,16 @@
+# Any VPS with Docker: `docker compose up -d`. Put a TLS proxy (Caddy, Traefik) in front of port 4801.
+services:
+  workbench:
+    build: .
+    restart: unless-stopped
+    ports: ["4801:4801"]
+    volumes: ["workbench-data:/data"]
+    environment:
+      # Optional: set a fixed access token instead of the generated one in /data/config/access-token
+      # NOVEL_WORKBENCH_TOKEN: change-me
+      # Keys for the review passes (the claude CLI login is not available in the cloud, so the API key route is used)
+      # ANTHROPIC_API_KEY: sk-ant-...
+      # GEMINI_API_KEY: ...
+      TZ: Asia/Kolkata
+volumes:
+  workbench-data:

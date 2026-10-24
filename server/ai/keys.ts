@@ -28,10 +28,19 @@ function writeFile(data: Record<string, string>): void {
   fs.chmodSync(fileStore(), 0o600);
 }
 
+const ENV: Record<string, string> = { anthropic: 'ANTHROPIC_API_KEY', gemini: 'GEMINI_API_KEY' };
+/** In a cloud deployment keys arrive as secrets in the environment; those win over the stores. */
+export function envKey(name: string): string | undefined {
+  const v = process.env[ENV[name] ?? ''];
+  return v && v.trim() ? v.trim() : undefined;
+}
+
 export async function keyStoreMode(): Promise<'keychain' | 'file'> {
   return (await loadKeytar()) ? 'keychain' : 'file';
 }
 export async function getKey(name: string): Promise<string | undefined> {
+  const fromEnv = envKey(name);
+  if (fromEnv) return fromEnv;
   const k = await loadKeytar();
   if (k) return (await k.getPassword(SERVICE, name)) ?? undefined;
   return readFile()[name];

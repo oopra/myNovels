@@ -7,7 +7,7 @@ import type { Store } from '../store';
 const run = promisify(execFile);
 
 /** Export the manuscript, bible and owed list as markdown and commit. Needs no network and no key. */
-export async function exportNovel(store: Store, novelFolder: string, title: string): Promise<{ dir: string; files: string[]; commit: string | null; gitError?: string }> {
+export async function exportNovel(store: Store, novelFolder: string, title: string): Promise<{ dir: string; files: string[]; commit: string | null; gitError?: string; pushed?: boolean }> {
   const dir = store.getSetting('export.path') || path.join(novelFolder, 'manuscript');
   fs.mkdirSync(path.join(dir, 'chapters'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'bible'), { recursive: true });
@@ -55,5 +55,17 @@ export async function exportNovel(store: Store, novelFolder: string, title: stri
     }
     commit = (await run('git', ['rev-parse', '--short', 'HEAD'], { cwd: dir })).stdout.trim();
   } catch (e) { gitError = (e as Error).message; }
-  return { dir, files, commit, gitError };
+  let pushed: boolean | undefined;
+  const remote = store.getSetting('export.remote');
+  if (remote && commit) {
+    try {
+      const existing = await run('git', ['remote'], { cwd: dir });
+      if (!existing.stdout.split('\n').includes('origin')) await run('git', ['remote', 'add', 'origin', remote], { cwd: dir });
+      else await run('git', ['remote', 'set-url', 'origin', remote], { cwd: dir });
+      const branch = (await run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir })).stdout.trim();
+      await run('git', ['push', '-u', 'origin', branch], { cwd: dir, timeout: 60_000 });
+      pushed = true;
+    } catch (e) { pushed = false; gitError = `push failed: ${(e as Error).message.split('\n').find(l => /fatal|error|remote:/.test(l)) ?? (e as Error).message}`; }
+  }
+  return { dir, files, commit, gitError, pushed };
 }

@@ -31,7 +31,7 @@ export function Manuscript() {
     setExporting(true);
     try {
       const r = await api.export();
-      toast(r.gitError ? `Exported ${r.files.length} files to ${r.dir}; git: ${r.gitError}` : `Exported ${r.files.length} files to ${r.dir} (commit ${r.commit})`, r.gitError ? 'err' : 'ok');
+      toast(r.gitError ? `Exported ${r.files.length} files to ${r.dir}; git: ${r.gitError}` : `Exported ${r.files.length} files to ${r.dir} (commit ${r.commit}${r.pushed ? ', pushed' : ''})`, r.gitError ? 'err' : 'ok');
     } catch (e) { toast((e as Error).message, 'err'); } finally { setExporting(false); }
   };
   const words = chapters.reduce((n, c) => n + c.word_count, 0);

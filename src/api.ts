@@ -66,11 +66,11 @@ export const api = {
   updateBible: (id: number, p: Partial<BiblePage>) => patch<BiblePage>(`/api/n/bible/${id}`, p),
   addVoiceSample: (text: string) => post<BiblePage>('/api/n/bible/voice/sample', { text }),
 
-  export: () => post<{ dir: string; files: string[]; commit: string | null; gitError?: string }>('/api/n/export'),
+  export: () => post<{ dir: string; files: string[]; commit: string | null; gitError?: string; pushed?: boolean }>('/api/n/export'),
 
   settings: () => get<Record<string, string>>('/api/n/settings'),
   saveSettings: (p: Record<string, string>) => put<Record<string, string>>('/api/n/settings', p),
-  keys: () => get<{ mode: 'keychain' | 'file'; anthropic: boolean; gemini: boolean }>('/api/keys'),
+  keys: () => get<{ mode: 'keychain' | 'file'; anthropic: boolean; gemini: boolean; env: { anthropic: boolean; gemini: boolean } }>('/api/keys'),
   setKey: (provider: ProviderId, key: string) => put<{ ok: boolean; mode: string }>(`/api/keys/${provider}`, { key }),
   providers: () => get<{ id: ProviderId; mode: string; ready: boolean; reason?: string; model: string; hasKey: boolean }[]>('/api/n/providers'),
   models: (id: ProviderId, refresh = false) => get<ModelInfo[]>(`/api/n/providers/${id}/models${refresh ? '?refresh=1' : ''}`),

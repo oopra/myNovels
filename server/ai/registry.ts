@@ -20,8 +20,7 @@ export async function anthropicMode(store: Store): Promise<'cli' | 'api'> {
   if (pref === 'api') return 'api';
   if (pref === 'cli') return 'cli';
   const cli = await AnthropicCliProvider.available();
-  if (cli.ok) return 'cli';
-  return (await getKey('anthropic')) ? 'api' : 'cli';
+  return cli.ok ? 'cli' : 'api';
 }
 
 export async function getProvider(id: ProviderId, store: Store): Promise<Provider> {
@@ -30,7 +29,7 @@ export async function getProvider(id: ProviderId, store: Store): Promise<Provide
     const mode = await anthropicMode(store);
     if (mode === 'api') {
       const key = await getKey('anthropic');
-      if (!key) throw new ProviderError('No Anthropic API key in Settings and the claude CLI is not available.', false, 401);
+      if (!key) throw new ProviderError('No Anthropic API key. Add one in Settings or set ANTHROPIC_API_KEY on the server; the claude CLI login is not available here.', false, 401);
       return new AnthropicSdkProvider(key);
     }
     const cli = await AnthropicCliProvider.available();
@@ -50,7 +49,7 @@ export async function providerStatus(store: Store): Promise<ProviderStatus[]> {
     const cli = await AnthropicCliProvider.available();
     out.push({ id: 'anthropic', mode: `Max login via claude CLI${cli.version ? ` (${cli.version})` : ''}`, ready: cli.ok, reason: cli.reason, model: modelFor(store, 'anthropic'), hasKey: aKey });
   } else {
-    out.push({ id: 'anthropic', mode: 'API key via @anthropic-ai/sdk', ready: aKey, reason: aKey ? undefined : 'No API key saved.', model: modelFor(store, 'anthropic'), hasKey: aKey });
+    out.push({ id: 'anthropic', mode: 'API key via @anthropic-ai/sdk', ready: aKey, reason: aKey ? undefined : 'No Anthropic API key. Paste one from the Claude Console here, or set ANTHROPIC_API_KEY on the server. (The claude CLI login is only available on a machine where Claude Code is installed and signed in.)', model: modelFor(store, 'anthropic'), hasKey: aKey });
   }
   const gKey = !!(await getKey('gemini'));
   out.push({ id: 'gemini', mode: 'API key via @google/genai', ready: gKey, reason: gKey ? undefined : 'No API key saved. Get one from Google AI Studio.', model: modelFor(store, 'gemini'), hasKey: gKey });

@@ -24,6 +24,24 @@ Bound to a non-loopback host the server requires an access token on every API ca
 
 In this mode the novel folders live on the server and every device sees the same database live. Writing needs the server to be reachable; see "Sync" below for the offline-first alternative.
 
+### In the cloud
+
+The novels, prompts, exports and the access token all live under `/data` in the container, so mount a persistent volume there. The `claude` CLI login is not available in the cloud; set `ANTHROPIC_API_KEY` (Claude Console; Max plans include monthly API credit) and `GEMINI_API_KEY` (AI Studio) as secrets and the app uses the API routes. Environment keys win over anything saved in Settings.
+
+**Fly.io** (TLS, a volume and suspend-when-idle come built in):
+
+```bash
+fly launch --copy-config --no-deploy        # creates the app from fly.toml; pick your region
+fly volumes create workbench_data --size 1  # 1 GB holds many novels
+fly secrets set ANTHROPIC_API_KEY=sk-ant-... GEMINI_API_KEY=... NOVEL_WORKBENCH_TOKEN=$(openssl rand -base64 24)
+fly deploy
+fly open                                    # paste the token when the UI asks
+```
+
+**Any VPS with Docker** (Hetzner, DigitalOcean, Lightsail): `docker compose up -d`, then put Caddy or another TLS proxy in front of port 4801. Railway and Render work the same way from the Dockerfile with a volume mounted at `/data`.
+
+**Backups and the manuscript never being trapped:** set *Export git remote* in Settings to a repository URL that carries a token (`https://<token>@github.com/you/manuscript.git`); every "Export + commit" then also pushes. For the database itself, snapshot the volume (`fly volumes snapshots list`) or copy `/data/novels/*/novel.db`; SQLite in WAL mode copies safely with `sqlite3 novel.db ".backup out.db"`.
+
 ## Layout
 
 ```
@@ -60,7 +78,7 @@ tests/    Vitest; fixtures are chapter one draft 2 (in voice) and draft 3 (flatt
 - **Anthropic, default:** spawns `claude -p --output-format stream-json --include-partial-messages --tools "" --system-prompt …` and parses the events into the provider stream. Uses the Claude Code login on the machine; if the CLI is missing the app says to run `claude` once and sign in. Token counts on this route are estimates.
 - **Anthropic, fallback:** `@anthropic-ai/sdk` with an API key; bible context goes in the system prompt with `cache_control`. Exact token counting.
 - **Gemini:** `@google/genai` with an AI Studio key. The model id is never hard-coded: it comes from `listModels` (cached a day) and Settings. Research turns on `googleSearch` grounding and records the sources on the review row.
-- Keys go to the OS keychain through `keytar`; if that library cannot load (no libsecret on this Linux container) they go to a 0600 file in the config directory. Never SQLite, never the novel folder.
+- Keys: `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` in the environment win (cloud); otherwise the OS keychain through `keytar`; if that library cannot load (no libsecret on this Linux container) a 0600 file in the config directory. Never SQLite, never the novel folder.
 - Rate limits and timeouts retry three times (1 s, 3 s, 9 s). A failed run writes no review row.
 
 Prompts are seeded to `<novel>/prompts/*.md` from `server/ai/prompts.ts` and edited in Settings; each review records the prompt's content hash. The line prompt carries an output-format footer the parser depends on.
